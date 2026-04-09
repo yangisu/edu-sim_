@@ -1,0 +1,233 @@
+{
+  "run_id": "run_474d675f13",
+  "lecture": {
+    "lecture_id": "lec_947298e4c8",
+    "title": "Python 데이터 분석 입문",
+    "objective_count": 5,
+    "objectives": [
+      {
+        "id": "OBJ-1",
+        "description": "데이터 분석의 기본 흐름은 문제 정의, 데이터 수집, 전처리, 시각화, 해석 순서로 진행된다.",
+        "keywords": [
+          "데이터",
+          "분석의",
+          "기본",
+          "흐름은",
+          "문제"
+        ],
+        "weight": 0.2
+      },
+      {
+        "id": "OBJ-2",
+        "description": "좋은 분석은 정답을 맞히는 것보다, 어떤 질문에 답하려는지 명확히 하는 것에서 시작한다.",
+        "keywords": [
+          "좋은",
+          "분석은",
+          "정답을",
+          "맞히는",
+          "것보다"
+        ],
+        "weight": 0.2
+      },
+      {
+        "id": "OBJ-3",
+        "description": "전처리 단계에서는 결측치 처리와 이상치 점검을 반드시 수행해야 한다.",
+        "keywords": [
+          "전처리",
+          "단계에서는",
+          "결측치",
+          "처리와",
+          "이상치"
+        ],
+        "weight": 0.2
+      },
+      {
+        "id": "OBJ-4",
+        "description": "시각화에서는 평균만 보여주지 말고 분포와 추세를 함께 제시해야 오해를 줄일 수 있다.",
+        "keywords": [
+          "시각화에서는",
+          "평균만",
+          "보여주지",
+          "말고",
+          "분포와"
+        ],
+        "weight": 0.2
+      },
+      {
+        "id": "OBJ-5",
+        "description": "최종 해석에서는 상관관계와 인과관계를 구분하고, 분석의 한계를 명시해야 한다.",
+        "keywords": [
+          "최종",
+          "해석에서는",
+          "상관관계와",
+          "인과관계를",
+          "구분하고"
+        ],
+        "weight": 0.2
+      }
+    ]
+  },
+  "group_summary": {
+    "advanced": {
+      "level": "advanced",
+      "count": 1,
+      "pre_avg": 78.58,
+      "post_avg": 100.0,
+      "gain_avg": 21.42,
+      "interview_avg": 100.0,
+      "effectiveness_avg": 52.85
+    },
+    "beginner": {
+      "level": "beginner",
+      "count": 1,
+      "pre_avg": 33.08,
+      "post_avg": 55.85,
+      "gain_avg": 22.77,
+      "interview_avg": 64.68,
+      "effectiveness_avg": 39.54
+    },
+    "intermediate": {
+      "level": "intermediate",
+      "count": 1,
+      "pre_avg": 57.24,
+      "post_avg": 84.91,
+      "gain_avg": 27.67,
+      "interview_avg": 87.92,
+      "effectiveness_avg": 51.77
+    }
+  },
+  "student_reports": [
+    {
+      "student_id": "stu_001",
+      "student_name": "민수",
+      "level": "beginner",
+      "pre_avg": 33.08,
+      "post_avg": 55.85,
+      "gain_avg": 22.77,
+      "interview_score": 64.68,
+      "learning_effectiveness": 39.54,
+      "objective_breakdown": [
+        {
+          "objective_id": "OBJ-1",
+          "pre": 35.67,
+          "post": 59.49,
+          "gain": 23.82
+        },
+        {
+          "objective_id": "OBJ-2",
+          "pre": 33.32,
+          "post": 55.89,
+          "gain": 22.57
+        },
+        {
+          "objective_id": "OBJ-3",
+          "pre": 34.97,
+          "post": 58.11,
+          "gain": 23.14
+        },
+        {
+          "objective_id": "OBJ-4",
+          "pre": 30.61,
+          "post": 53.56,
+          "gain": 22.95
+        },
+        {
+          "objective_id": "OBJ-5",
+          "pre": 30.84,
+          "post": 52.22,
+          "gain": 21.38
+        }
+      ]
+    },
+    {
+      "student_id": "stu_002",
+      "student_name": "지은",
+      "level": "intermediate",
+      "pre_avg": 57.24,
+      "post_avg": 84.91,
+      "gain_avg": 27.67,
+      "interview_score": 87.92,
+      "learning_effectiveness": 51.77,
+      "objective_breakdown": [
+        {
+          "objective_id": "OBJ-1",
+          "pre": 61.81,
+          "post": 92.66,
+          "gain": 30.85
+        },
+        {
+          "objective_id": "OBJ-2",
+          "pre": 60.53,
+          "post": 88.34,
+          "gain": 27.81
+        },
+        {
+          "objective_id": "OBJ-3",
+          "pre": 54.4,
+          "post": 82.07,
+          "gain": 27.67
+        },
+        {
+          "objective_id": "OBJ-4",
+          "pre": 54.45,
+          "post": 78.81,
+          "gain": 24.36
+        },
+        {
+          "objective_id": "OBJ-5",
+          "pre": 55.01,
+          "post": 82.66,
+          "gain": 27.65
+        }
+      ]
+    },
+    {
+      "student_id": "stu_003",
+      "student_name": "하준",
+      "level": "advanced",
+      "pre_avg": 78.58,
+      "post_avg": 100.0,
+      "gain_avg": 21.42,
+      "interview_score": 100.0,
+      "learning_effectiveness": 52.85,
+      "objective_breakdown": [
+        {
+          "objective_id": "OBJ-1",
+          "pre": 78.28,
+          "post": 100.0,
+          "gain": 21.72
+        },
+        {
+          "objective_id": "OBJ-2",
+          "pre": 76.89,
+          "post": 100.0,
+          "gain": 23.11
+        },
+        {
+          "objective_id": "OBJ-3",
+          "pre": 82.19,
+          "post": 100.0,
+          "gain": 17.81
+        },
+        {
+          "objective_id": "OBJ-4",
+          "pre": 78.3,
+          "post": 100.0,
+          "gain": 21.7
+        },
+        {
+          "objective_id": "OBJ-5",
+          "pre": 77.22,
+          "post": 100.0,
+          "gain": 22.78
+        }
+      ]
+    }
+  ],
+  "config": {
+    "lecture_quality": 0.8,
+    "lecture_difficulty": 0.45,
+    "max_objectives": 5
+  },
+  "generated_at_utc": "2026-04-09T12:24:06.623870"
+}

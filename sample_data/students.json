@@ -1,0 +1,45 @@
+[
+  {
+    "id": "stu_001",
+    "name": "민수",
+    "level": "beginner",
+    "traits": {
+      "focus": 0.52,
+      "curiosity": 0.68,
+      "prior_knowledge": 0.31,
+      "anxiety": 0.44,
+      "adaptability": 0.58
+    },
+    "strengths": ["시각화"],
+    "weaknesses": ["인과관계"]
+  },
+  {
+    "id": "stu_002",
+    "name": "지은",
+    "level": "intermediate",
+    "traits": {
+      "focus": 0.74,
+      "curiosity": 0.62,
+      "prior_knowledge": 0.57,
+      "anxiety": 0.21,
+      "adaptability": 0.66
+    },
+    "strengths": ["전처리", "해석"],
+    "weaknesses": ["이상치"]
+  },
+  {
+    "id": "stu_003",
+    "name": "하준",
+    "level": "advanced",
+    "traits": {
+      "focus": 0.81,
+      "curiosity": 0.59,
+      "prior_knowledge": 0.78,
+      "anxiety": 0.18,
+      "adaptability": 0.72
+    },
+    "strengths": ["인과관계", "전처리"],
+    "weaknesses": []
+  }
+]
+
