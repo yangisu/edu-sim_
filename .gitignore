@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+
+# local run artifacts
+*.db
+*.db-journal
+edu_sim_store.json
+result*.json
+plan_*.json
+write_test.txt
+check.db
+check.db-journal
+

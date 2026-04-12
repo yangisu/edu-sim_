@@ -5,16 +5,18 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from .assessment_policy import PROFICIENCY_BANDS, score_to_band
 from .interview_engine import InterviewEngine
 from .lecture_engine import LectureEngine
 from .models import StudentProfile
+from .plan_service import InstructorPlanService
 from .repository import Repository
 from .rubric_engine import RubricEngine
 from .student_simulator import StudentSimulator
 
 
 class WorkflowService:
-    """강의 입력부터 시뮬레이션/평가까지 end-to-end를 수행하는 서비스."""
+    """강의 입력부터 시뮬레이션과 평가까지 end-to-end 실행."""
 
     def __init__(
         self,
@@ -29,6 +31,11 @@ class WorkflowService:
         self.simulator = simulator or StudentSimulator()
         self.rubric_engine = rubric_engine or RubricEngine()
         self.interview_engine = interview_engine or InterviewEngine()
+        self.plan_service = InstructorPlanService(
+            repository=self.repo,
+            lecture_engine=self.lecture_engine,
+            rubric_engine=self.rubric_engine,
+        )
 
     def run(
         self,
@@ -36,6 +43,7 @@ class WorkflowService:
         lecture_content: str,
         students: list[StudentProfile],
         config: dict[str, Any] | None = None,
+        lecture_package: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         config = config or {}
         now = datetime.now(timezone.utc).isoformat()
@@ -46,15 +54,27 @@ class WorkflowService:
         self.repo.upsert_students(students, now)
         self.repo.create_run(run_id, lecture_id, config, now)
 
-        objectives = self.lecture_engine.extract_objectives(
-            lecture_content,
-            max_objectives=int(config.get("max_objectives", 5)),
-        )
-        criteria = self.rubric_engine.generate(objectives)
+        plan_id_used: str | None = config.get("approved_plan_id")
+        if plan_id_used:
+            approved_plan = self.plan_service.get_approved_plan(plan_id_used)
+            objectives = self.plan_service.objectives_from_plan(approved_plan)
+            criteria = self.plan_service.rubric_from_plan(approved_plan)
+        else:
+            if lecture_package:
+                objectives = self.lecture_engine.extract_objectives_from_package(
+                    lecture_package,
+                    max_objectives=int(config.get("max_objectives", 5)),
+                )
+            else:
+                objectives = self.lecture_engine.extract_objectives(
+                    lecture_content,
+                    max_objectives=int(config.get("max_objectives", 5)),
+                )
+            criteria = self.rubric_engine.generate(objectives)
 
         all_sim_rows: list[tuple[str, str, str, str, float]] = []
         student_reports: list[dict[str, Any]] = []
-        group_bucket: dict[str, list[dict[str, float]]] = defaultdict(list)
+        group_bucket: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
         for student in students:
             sim = self.simulator.simulate(
@@ -74,20 +94,28 @@ class WorkflowService:
                 all_sim_rows.append((run_id, student.id, p.objective_id, "post", p.post_score))
 
             interview_payload = {
+                "proficiency_level": interview.proficiency_level,
                 "evaluations": [
                     {
                         "criterion_id": e.criterion_id,
                         "score_5_scale": e.score_5_scale,
+                        "score_100": e.score_100,
+                        "axis_scores": e.axis_scores,
+                        "proficiency_level": e.proficiency_level,
                         "confidence": e.confidence,
                         "comment": e.comment,
                         "question": self._criterion_question(e.criterion_id, criteria),
                     }
                     for e in interview.evaluations
-                ]
+                ],
             }
             self.repo.save_interview(run_id, student.id, interview.total_score_100, interview_payload)
 
+            pre_band = score_to_band(sim.pre_avg)
+            post_band = score_to_band(sim.post_avg)
+            interview_band = score_to_band(interview.total_score_100)
             learning_effectiveness = round(sim.gain_avg * 0.6 + interview.total_score_100 * 0.4, 2)
+
             student_report = {
                 "student_id": student.id,
                 "student_name": student.name,
@@ -95,7 +123,10 @@ class WorkflowService:
                 "pre_avg": round(sim.pre_avg, 2),
                 "post_avg": round(sim.post_avg, 2),
                 "gain_avg": round(sim.gain_avg, 2),
+                "pre_proficiency": pre_band.label,
+                "post_proficiency": post_band.label,
                 "interview_score": interview.total_score_100,
+                "interview_proficiency": interview_band.label,
                 "learning_effectiveness": learning_effectiveness,
                 "objective_breakdown": [
                     {
@@ -115,6 +146,9 @@ class WorkflowService:
                     "gain": sim.gain_avg,
                     "interview": interview.total_score_100,
                     "effectiveness": learning_effectiveness,
+                    "pre_band_key": pre_band.key,
+                    "post_band_key": post_band.key,
+                    "interview_band_key": interview_band.key,
                 }
             )
 
@@ -133,7 +167,8 @@ class WorkflowService:
                         "question": self.interview_engine.build_question(c),
                     }
                     for c in criteria
-                ]
+                ],
+                "scoring_standard": self.interview_engine.scoring_standard(),
             },
         )
 
@@ -147,6 +182,8 @@ class WorkflowService:
                 "lecture_id": lecture_id,
                 "title": lecture_title,
                 "objective_count": len(objectives),
+                "input_format": "lecture_package" if lecture_package else "plain_text",
+                "metadata": lecture_package.get("metadata", {}) if lecture_package else {},
                 "objectives": [
                     {
                         "id": o.id,
@@ -157,17 +194,22 @@ class WorkflowService:
                     for o in objectives
                 ],
             },
+            "scoring_standard": self.interview_engine.scoring_standard(),
             "group_summary": group_summary,
             "student_reports": student_reports,
             "config": config,
+            "approved_plan_id": plan_id_used,
             "generated_at_utc": now,
         }
         self.repo.save_report(run_id, report)
         return report
 
     @staticmethod
-    def _summarize_group(level: str, rows: list[dict[str, float]]) -> dict[str, Any]:
+    def _summarize_group(level: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         count = len(rows)
+        pre_dist = WorkflowService._distribution(rows, "pre_band_key")
+        post_dist = WorkflowService._distribution(rows, "post_band_key")
+        interview_dist = WorkflowService._distribution(rows, "interview_band_key")
         return {
             "level": level,
             "count": count,
@@ -176,11 +218,26 @@ class WorkflowService:
             "gain_avg": round(sum(r["gain"] for r in rows) / count, 2),
             "interview_avg": round(sum(r["interview"] for r in rows) / count, 2),
             "effectiveness_avg": round(sum(r["effectiveness"] for r in rows) / count, 2),
+            "pre_proficiency_distribution": pre_dist,
+            "post_proficiency_distribution": post_dist,
+            "interview_proficiency_distribution": interview_dist,
         }
+
+    @staticmethod
+    def _distribution(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
+        labels = {band.key: band.label for band in PROFICIENCY_BANDS}
+        result: dict[str, int] = {label: 0 for label in labels.values()}
+        for row in rows:
+            band_key = row.get(key)
+            label = labels.get(band_key)
+            if label:
+                result[label] += 1
+        return result
 
     @staticmethod
     def _criterion_question(criterion_id: str, criteria: list[Any]) -> str:
         for criterion in criteria:
             if criterion.id == criterion_id:
                 return InterviewEngine.build_question(criterion)
-        return "관련 개념을 실제 사례와 함께 설명하세요."
+        return "해당 개념을 실제 사례와 함께 설명하세요."
+

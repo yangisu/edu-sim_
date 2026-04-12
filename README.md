@@ -1,37 +1,49 @@
 # edu_sim MVP
 
-강사의 수업 내용을 기반으로,
-1) 학생 역할 AI를 수준별/개인별로 시뮬레이션하고
-2) AI 면접관 방식으로 교육 결과를 정량 검증하는
-프로젝트의 최소 기능 제품(MVP)입니다.
+강의 데이터를 기반으로 학생 시뮬레이션과 교육 효과 검증을 수행하는 MVP입니다.
 
-## 1. MVP에서 실제 동작하는 것
+## 핵심 기능
 
-- 강의 텍스트 입력
-- 강의 목표(learning objectives) 자동 추출
-- 수준별 학생(초급/중급/고급) + 개인 특성 기반 사전/사후 이해도 시뮬레이션
-- 강의 목표 기반 정량 평가 기준(Rubric) 생성
-- AI 면접 점수(100점) 계산
-- 그룹/개인 리포트 생성 및 JSON 저장소 저장
+- 학생 수준/특성 기반 사전-사후 이해도 시뮬레이션
+- AI 면접형 평가 점수(100점) 산출
+- 행동 기반 성취수준 분류
+- 강사 승인 워크플로우(초안 생성 -> 수정 -> 승인 -> 승인본 실행)
+- 표준 lecture package 입력 지원
 
-## 2. 코드 연결 구조
+## lecture 입력 포맷
 
-```text
-CLI (src/edu_sim/cli.py)
-  -> WorkflowService (src/edu_sim/orchestrator.py)
-      -> LectureEngine (학습목표 추출)
-      -> StudentSimulator (사전/사후 이해도 시뮬레이션)
-      -> RubricEngine (정량 평가 기준 생성)
-      -> InterviewEngine (면접 점수화)
-      -> Repository (JSON 저장/조회)
-```
+### 1) 텍스트 강의
 
-핵심 연결 키는 `run_id`입니다.
-하나의 실행(run) 안에서 시뮬레이션 점수, rubric, 면접 결과, 최종 리포트가 모두 연결 저장됩니다.
+`--lecture-file`로 일반 텍스트를 입력합니다.
 
-## 3. 실행 방법
+### 2) 표준 lecture package (권장)
 
-실행 전 한 번 `src` 경로를 Python path에 추가합니다.
+`--lecture-package-file`로 JSON 패키지를 입력합니다.
+
+필드:
+- `transcript` (필수): STT 텍스트
+- `materials` (선택): 교안 텍스트 배열(문자열 또는 `{type,text}` 객체)
+- `metadata` (선택): 과목/난이도/시간/선수지식
+- `instructor_objectives` (선택): 강사 작성 학습목표 초안
+
+샘플: [lecture_package.json](D:/KIT/edu_sim/sample_data/lecture_package.json)
+
+## 정량 평가 기준
+
+면접 점수는 각 기준(criterion)마다 아래 4축을 0~4로 계산한 후 가중합합니다.
+
+- 개념 정확성: 30
+- 절차 수행력: 30
+- 사례 적용력: 25
+- 근거 기반 설명력: 15
+
+성취수준(100점 기준):
+- 0~39: 입문 미도달
+- 40~59: 기초
+- 60~79: 적용
+- 80~100: 숙련
+
+## 실행 전 설정
 
 PowerShell:
 
@@ -39,66 +51,82 @@ PowerShell:
 $env:PYTHONPATH = "src"
 ```
 
-### 3-1. 데모 실행
+## 실행 방법
+
+### 데모
 
 ```bash
 python -m edu_sim.cli run-demo --db-path edu_sim_store.json --output result.json
 ```
 
-입력 파일:
-- `sample_data/lecture.txt`
-- `sample_data/students.json`
-
-### 3-2. 사용자 파일로 실행
+### 텍스트 강의로 실행
 
 ```bash
 python -m edu_sim.cli run \
   --lecture-file sample_data/lecture.txt \
   --students-file sample_data/students.json \
-  --lecture-title "맞춤형 수업" \
-  --lecture-quality 0.85 \
-  --lecture-difficulty 0.45 \
-  --max-objectives 5 \
+  --lecture-title "텍스트 강의" \
   --db-path edu_sim_store.json \
-  --output result.json
+  --output result_text.json
 ```
 
-### 3-3. 기존 실행 결과 조회
+### lecture package로 실행
+
+```bash
+python -m edu_sim.cli run \
+  --lecture-package-file sample_data/lecture_package.json \
+  --students-file sample_data/students.json \
+  --lecture-title "패키지 강의" \
+  --db-path edu_sim_store.json \
+  --output result_package.json
+```
+
+### 강사 승인 워크플로우
+
+1) 초안 생성
+
+```bash
+python -m edu_sim.cli draft-plan \
+  --lecture-package-file sample_data/lecture_package.json \
+  --lecture-title "승인 대상 강의" \
+  --db-path edu_sim_store.json \
+  --output plan_draft.json
+```
+
+2) `plan_draft.json` 수정(강사 검토)
+
+3) 승인
+
+```bash
+python -m edu_sim.cli approve-plan \
+  --plan-file plan_draft.json \
+  --approved-by "instructor_kim" \
+  --approval-notes "1차 승인" \
+  --db-path edu_sim_store.json
+```
+
+4) 승인 플랜으로 실행
+
+```bash
+python -m edu_sim.cli run \
+  --lecture-package-file sample_data/lecture_package.json \
+  --students-file sample_data/students.json \
+  --lecture-title "승인 적용 실행" \
+  --approved-plan-id <plan_id> \
+  --db-path edu_sim_store.json \
+  --output result_approved.json
+```
+
+### 결과 조회
 
 ```bash
 python -m edu_sim.cli show-run --run-id <run_id> --db-path edu_sim_store.json
+python -m edu_sim.cli show-plan --plan-id <plan_id> --db-path edu_sim_store.json
 ```
 
-## 4. students.json 스키마
-
-```json
-[
-  {
-    "id": "stu_001",
-    "name": "민수",
-    "level": "beginner",
-    "traits": {
-      "focus": 0.52,
-      "curiosity": 0.68,
-      "prior_knowledge": 0.31,
-      "anxiety": 0.44,
-      "adaptability": 0.58
-    },
-    "strengths": ["시각화"],
-    "weaknesses": ["인과관계"]
-  }
-]
-```
-
-## 5. 테스트
+## 테스트
 
 ```bash
-python -m pytest -q
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-## 6. 확장 포인트 (다음 단계)
-
-- 실제 LLM 연동(OpenAI 등)으로 면접 답변 생성/채점 고도화
-- 강사 입력 인터페이스(Web/API) 추가
-- 실데이터(시험/설문)와 시뮬레이션 점수 보정(calibration)
-- 학생 개인 디지털 트윈(장기 학습 기록 기반) 모델링

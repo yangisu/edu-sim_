@@ -72,6 +72,9 @@ class RubricCriterion:
 class CriterionEvaluation:
     criterion_id: str
     score_5_scale: float
+    score_100: float
+    axis_scores: dict[str, float]
+    proficiency_level: str
     confidence: float
     comment: str
 
@@ -80,6 +83,7 @@ class CriterionEvaluation:
 class InterviewResult:
     student_id: str
     total_score_100: float
+    proficiency_level: str
     evaluations: list[CriterionEvaluation]
 
 

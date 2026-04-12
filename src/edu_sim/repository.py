@@ -17,6 +17,7 @@ class Repository:
     def _empty_store(self) -> dict[str, Any]:
         return {
             "lectures": {},
+            "lecture_plans": {},
             "students": {},
             "runs": {},
             "simulation_scores": [],
@@ -33,7 +34,11 @@ class Repository:
         if self.path.exists():
             text = self.path.read_text(encoding="utf-8").strip()
             if text:
-                return json.loads(text)
+                loaded = json.loads(text)
+                base = self._empty_store()
+                for key, value in loaded.items():
+                    base[key] = value
+                return base
         self.path.write_text(json.dumps(self._empty_store(), ensure_ascii=False, indent=2), encoding="utf-8")
         return self._empty_store()
 
@@ -52,6 +57,14 @@ class Repository:
             "created_at": created_at,
         }
         self._flush()
+
+    def save_lecture_plan(self, plan_id: str, plan: dict[str, Any]) -> None:
+        self.data["lecture_plans"][plan_id] = plan
+        self._flush()
+
+    def get_lecture_plan(self, plan_id: str) -> dict[str, Any] | None:
+        plan = self.data["lecture_plans"].get(plan_id)
+        return plan if plan is not None else None
 
     def upsert_students(self, students: list[StudentProfile], created_at: str) -> None:
         for student in students:
