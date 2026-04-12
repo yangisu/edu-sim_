@@ -45,6 +45,9 @@
 
 ## 실행 전 설정
 
+> **요구사항: Python 3.11 이상**
+> `@dataclass(slots=True)` 등 3.11+ 전용 기능을 사용합니다. `pyproject.toml`의 `requires-python = ">=3.11"` 조건을 확인하세요.
+
 PowerShell:
 
 ```powershell
