@@ -31,6 +31,12 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path in {"/", "/index.html", "/web/index.html"}:
+            self._send_text(200, _load_web_index(), content_type="text/html; charset=utf-8")
+            return
+        if path in {"/favicon.ico", "/favicon.png"}:
+            self._send_json(204, {})
+            return
         if path == "/api/health":
             self._send_json(
                 200,
@@ -43,6 +49,9 @@ class handler(BaseHTTPRequestHandler):
             return
         if path == "/api/sample-payload":
             self._send_json(200, _sample_payload())
+            return
+        if not path.startswith("/api/"):
+            self._send_text(200, _load_web_index(), content_type="text/html; charset=utf-8")
             return
         self._send_json(404, {"error": "not_found", "message": f"unknown path: {path}"})
 
@@ -77,6 +86,18 @@ class handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if status != 204:
+            self.wfile.write(body)
+
+    def _send_text(self, status: int, text: str, content_type: str = "text/plain; charset=utf-8") -> None:
+        body = text.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -199,3 +220,10 @@ def _sample_payload() -> dict[str, Any]:
             "interview_mode": "rule",
         },
     }
+
+
+def _load_web_index() -> str:
+    html_file = ROOT / "web" / "index.html"
+    if html_file.exists():
+        return html_file.read_text(encoding="utf-8")
+    return "<html><body><h1>EvalBuddy</h1><p>web/index.html not found</p></body></html>"
