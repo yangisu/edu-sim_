@@ -18,7 +18,7 @@ from .student_trained_model import StudentModelPredictor
 
 
 class WorkflowService:
-    """강의 입력부터 학생 시뮬레이션/평가까지 end-to-end 실행."""
+    """강의 입력 -> 학생 시뮬레이션 -> 평가 리포트 생성."""
 
     def __init__(
         self,
@@ -144,29 +144,30 @@ class WorkflowService:
             interview_band = score_to_band(interview.total_score_100)
             learning_effectiveness = round(sim.gain_avg * 0.6 + interview.total_score_100 * 0.4, 2)
 
-            student_report = {
-                "student_id": student.id,
-                "student_name": student.name,
-                "level": student.level,
-                "pre_avg": round(sim.pre_avg, 2),
-                "post_avg": round(sim.post_avg, 2),
-                "gain_avg": round(sim.gain_avg, 2),
-                "pre_proficiency": pre_band.label,
-                "post_proficiency": post_band.label,
-                "interview_score": interview.total_score_100,
-                "interview_proficiency": interview_band.label,
-                "learning_effectiveness": learning_effectiveness,
-                "objective_breakdown": [
-                    {
-                        "objective_id": p.objective_id,
-                        "pre": p.pre_score,
-                        "post": p.post_score,
-                        "gain": round(p.gain, 2),
-                    }
-                    for p in sim.objective_progress
-                ],
-            }
-            student_reports.append(student_report)
+            student_reports.append(
+                {
+                    "student_id": student.id,
+                    "student_name": student.name,
+                    "level": student.level,
+                    "pre_avg": round(sim.pre_avg, 2),
+                    "post_avg": round(sim.post_avg, 2),
+                    "gain_avg": round(sim.gain_avg, 2),
+                    "pre_proficiency": pre_band.label,
+                    "post_proficiency": post_band.label,
+                    "interview_score": interview.total_score_100,
+                    "interview_proficiency": interview_band.label,
+                    "learning_effectiveness": learning_effectiveness,
+                    "objective_breakdown": [
+                        {
+                            "objective_id": p.objective_id,
+                            "pre": p.pre_score,
+                            "post": p.post_score,
+                            "gain": round(p.gain, 2),
+                        }
+                        for p in sim.objective_progress
+                    ],
+                }
+            )
             group_bucket[student.level].append(
                 {
                     "pre": sim.pre_avg,
@@ -275,7 +276,7 @@ class WorkflowService:
             engine = LlmInterviewEngine(model=llm_model, api_key=llm_api_key)
             return "llm", engine, f"llm interview engine model={llm_model}"
         except Exception as exc:  # noqa: BLE001
-            return "rule", None, f"llm init failed, fallback to rule engine: {exc}"
+            return "rule_fallback", None, f"llm init failed, fallback to rule engine: {exc}"
 
     @staticmethod
     def _summarize_group(level: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -312,7 +313,7 @@ class WorkflowService:
         if code == "llm":
             return "LLM 면접 평가"
         if code == "rule_fallback":
-            return "LLM 실패 후 규칙 평가 fallback"
+            return "LLM 초기화 실패 후 규칙 평가 fallback"
         return "규칙 기반 면접 평가"
 
     @staticmethod
@@ -320,5 +321,4 @@ class WorkflowService:
         for criterion in criteria:
             if criterion.id == criterion_id:
                 return InterviewEngine.build_question(criterion)
-        return "해당 개념을 실제 사례와 함께 설명하세요."
-
+        return "해당 개념을 실제 상황에 어떻게 적용하는지 설명하세요."

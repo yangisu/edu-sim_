@@ -22,7 +22,7 @@ class LlmInterviewFallbackTest(unittest.TestCase):
             students=students,
             config={"interview_mode": "llm", "llm_model": "gpt-4o-mini"},
         )
-        self.assertEqual(report["interview_engine_used"], "rule")
+        self.assertEqual(report["interview_engine_used"], "rule_fallback")
         self.assertIn("fallback", report["interview_engine_note"])
 
 
