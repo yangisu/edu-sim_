@@ -11,3 +11,10 @@ write_test.txt
 check.db
 check.db-journal
 
+# local ML artifacts / datasets
+ml_data/
+ml_models/
+Sample/
+Sample.zip
+.vercel/
+saved_models/

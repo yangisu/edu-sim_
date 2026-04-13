@@ -1,0 +1,57 @@
+[
+  {
+    "id": "sim_mid_001",
+    "name": "가상학생_001",
+    "mode": "synthetic",
+    "level": "intermediate",
+    "knowledge_level_100": 52.23,
+    "intelligence_level_100": 47.4,
+    "traits": {},
+    "strengths": [],
+    "weaknesses": []
+  },
+  {
+    "id": "sim_mid_002",
+    "name": "가상학생_002",
+    "mode": "synthetic",
+    "level": "intermediate",
+    "knowledge_level_100": 46.4,
+    "intelligence_level_100": 50.57,
+    "traits": {},
+    "strengths": [],
+    "weaknesses": []
+  },
+  {
+    "id": "sim_mid_003",
+    "name": "가상학생_003",
+    "mode": "synthetic",
+    "level": "intermediate",
+    "knowledge_level_100": 53.78,
+    "intelligence_level_100": 57.83,
+    "traits": {},
+    "strengths": [],
+    "weaknesses": []
+  },
+  {
+    "id": "sim_mid_004",
+    "name": "가상학생_004",
+    "mode": "synthetic",
+    "level": "intermediate",
+    "knowledge_level_100": 56.27,
+    "intelligence_level_100": 48.39,
+    "traits": {},
+    "strengths": [],
+    "weaknesses": []
+  },
+  {
+    "id": "sim_mid_005",
+    "name": "가상학생_005",
+    "mode": "synthetic",
+    "level": "intermediate",
+    "knowledge_level_100": 48.75,
+    "intelligence_level_100": 47.48,
+    "traits": {},
+    "strengths": [],
+    "weaknesses": []
+  }
+]

@@ -8,15 +8,17 @@ from uuid import uuid4
 from .assessment_policy import PROFICIENCY_BANDS, score_to_band
 from .interview_engine import InterviewEngine
 from .lecture_engine import LectureEngine
+from .llm_interview_engine import LlmInterviewEngine
 from .models import StudentProfile
 from .plan_service import InstructorPlanService
 from .repository import Repository
 from .rubric_engine import RubricEngine
 from .student_simulator import StudentSimulator
+from .student_trained_model import StudentModelPredictor
 
 
 class WorkflowService:
-    """강의 입력부터 시뮬레이션과 평가까지 end-to-end 실행."""
+    """강의 입력부터 학생 시뮬레이션/평가까지 end-to-end 실행."""
 
     def __init__(
         self,
@@ -72,6 +74,9 @@ class WorkflowService:
                 )
             criteria = self.rubric_engine.generate(objectives)
 
+        model_predictor = self._load_student_model_predictor(config)
+        interview_mode, llm_engine, interview_note = self._build_interview_engine(config)
+
         all_sim_rows: list[tuple[str, str, str, str, float]] = []
         student_reports: list[dict[str, Any]] = []
         group_bucket: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -82,18 +87,39 @@ class WorkflowService:
                 objectives=objectives,
                 lecture_quality=float(config.get("lecture_quality", 0.8)),
                 lecture_difficulty=float(config.get("lecture_difficulty", 0.5)),
+                model_predictor=model_predictor,
             )
-            interview = self.interview_engine.evaluate(
-                student_id=student.id,
-                simulation=sim,
-                criteria=criteria,
-            )
+
+            interview_used = interview_mode
+            if interview_mode == "llm" and llm_engine is not None:
+                try:
+                    interview = llm_engine.evaluate(
+                        student=student,
+                        simulation=sim,
+                        criteria=criteria,
+                        lecture_title=lecture_title,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    interview = self.interview_engine.evaluate(
+                        student_id=student.id,
+                        simulation=sim,
+                        criteria=criteria,
+                    )
+                    interview_used = "rule_fallback"
+                    interview_note = f"llm failed and fallback applied: {exc}"
+            else:
+                interview = self.interview_engine.evaluate(
+                    student_id=student.id,
+                    simulation=sim,
+                    criteria=criteria,
+                )
 
             for p in sim.objective_progress:
                 all_sim_rows.append((run_id, student.id, p.objective_id, "pre", p.pre_score))
                 all_sim_rows.append((run_id, student.id, p.objective_id, "post", p.post_score))
 
             interview_payload = {
+                "engine": interview_used,
                 "proficiency_level": interview.proficiency_level,
                 "evaluations": [
                     {
@@ -199,10 +225,35 @@ class WorkflowService:
             "student_reports": student_reports,
             "config": config,
             "approved_plan_id": plan_id_used,
+            "student_simulator_engine": "trained_model" if model_predictor is not None else "rule",
+            "interview_engine_used": interview_mode,
+            "interview_engine_note": interview_note,
             "generated_at_utc": now,
         }
         self.repo.save_report(run_id, report)
         return report
+
+    def _load_student_model_predictor(self, config: dict[str, Any]) -> StudentModelPredictor | None:
+        model_path = str(config.get("student_model_path", "")).strip()
+        if not model_path:
+            return None
+        return StudentModelPredictor.from_file(model_path)
+
+    def _build_interview_engine(
+        self,
+        config: dict[str, Any],
+    ) -> tuple[str, LlmInterviewEngine | None, str]:
+        mode = str(config.get("interview_mode", "rule")).strip().lower()
+        if mode != "llm":
+            return "rule", None, "rule-based interview engine"
+
+        llm_model = str(config.get("llm_model", "gpt-4o-mini"))
+        llm_api_key = str(config.get("llm_api_key", "")).strip() or None
+        try:
+            engine = LlmInterviewEngine(model=llm_model, api_key=llm_api_key)
+            return "llm", engine, f"llm interview engine model={llm_model}"
+        except Exception as exc:  # noqa: BLE001
+            return "rule", None, f"llm init failed, fallback to rule engine: {exc}"
 
     @staticmethod
     def _summarize_group(level: str, rows: list[dict[str, Any]]) -> dict[str, Any]:

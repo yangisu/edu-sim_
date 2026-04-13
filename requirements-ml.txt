@@ -1,0 +1,11 @@
+torch>=2.2
+datasets>=2.20
+transformers>=4.42
+evaluate>=0.4
+peft>=0.11
+accelerate>=0.31
+openai>=1.40
+numpy>=1.26
+scipy>=1.11
+soundfile>=0.12
+jiwer>=3.0

@@ -1,49 +1,20 @@
-# edu_sim MVP
+# EvalBuddy (`edu_sim`)
 
-강의 데이터를 기반으로 학생 시뮬레이션과 교육 효과 검증을 수행하는 MVP입니다.
+강의 내용을 입력하면 학생 시뮬레이터와 AI 면접 평가를 통해 교육 효과를 정량적으로 예측하는 프로젝트입니다.
 
-## 핵심 기능
+## 핵심 구성
 
-- 학생 수준/특성 기반 사전-사후 이해도 시뮬레이션
-- AI 면접형 평가 점수(100점) 산출
-- 행동 기반 성취수준 분류
-- 강사 승인 워크플로우(초안 생성 -> 수정 -> 승인 -> 승인본 실행)
-- 표준 lecture package 입력 지원
+- `src/edu_sim`: 실행 엔진 (강의 목표 추출, 학생 시뮬레이션, 면접 평가, 리포트 생성)
+- `src/edu_sim_ml`: 데이터/모델 파이프라인
+  - AI-Hub 데이터 로더
+  - lecture package 생성기
+  - Whisper ASR 학습
+  - 학생 시뮬레이터 학습
+  - 면접관 LLM 파인튜닝 데이터/잡 생성
+- `api/index.py`: Vercel Python API (웹 백엔드)
+- `web/index.html`: EvalBuddy 웹 UI (프론트엔드)
 
-## lecture 입력 포맷
-
-### 1) 텍스트 강의
-
-`--lecture-file`로 일반 텍스트를 입력합니다.
-
-### 2) 표준 lecture package (권장)
-
-`--lecture-package-file`로 JSON 패키지를 입력합니다.
-
-필드:
-- `transcript` (필수): STT 텍스트
-- `materials` (선택): 교안 텍스트 배열(문자열 또는 `{type,text}` 객체)
-- `metadata` (선택): 과목/난이도/시간/선수지식
-- `instructor_objectives` (선택): 강사 작성 학습목표 초안
-
-샘플: [lecture_package.json](D:/KIT/edu_sim/sample_data/lecture_package.json)
-
-## 정량 평가 기준
-
-면접 점수는 각 기준(criterion)마다 아래 4축을 0~4로 계산한 후 가중합합니다.
-
-- 개념 정확성: 30
-- 절차 수행력: 30
-- 사례 적용력: 25
-- 근거 기반 설명력: 15
-
-성취수준(100점 기준):
-- 0~39: 입문 미도달
-- 40~59: 기초
-- 60~79: 적용
-- 80~100: 숙련
-
-## 실행 전 설정
+## 빠른 시작 (로컬)
 
 > **요구사항: Python 3.11 이상**
 > `@dataclass(slots=True)` 등 3.11+ 전용 기능을 사용합니다. `pyproject.toml`의 `requires-python = ">=3.11"` 조건을 확인하세요.
@@ -54,82 +25,107 @@ PowerShell:
 $env:PYTHONPATH = "src"
 ```
 
-## 실행 방법
+데모 실행:
 
-### 데모
-
-```bash
+```powershell
 python -m edu_sim.cli run-demo --db-path edu_sim_store.json --output result.json
 ```
 
-### 텍스트 강의로 실행
+## 학생 시뮬레이터 학습/저장
 
-```bash
-python -m edu_sim.cli run \
-  --lecture-file sample_data/lecture.txt \
-  --students-file sample_data/students.json \
-  --lecture-title "텍스트 강의" \
-  --db-path edu_sim_store.json \
-  --output result_text.json
+1) 학습셋 생성
+
+```powershell
+python -m edu_sim_ml.cli build-student-trainset `
+  --store-file "edu_sim_store.json" `
+  --output-file "ml_data/student_sim_train.jsonl"
 ```
 
-### lecture package로 실행
+2) 모델 학습
 
-```bash
-python -m edu_sim.cli run \
-  --lecture-package-file sample_data/lecture_package.json \
-  --students-file sample_data/students.json \
-  --lecture-title "패키지 강의" \
-  --db-path edu_sim_store.json \
-  --output result_package.json
+```powershell
+python -m edu_sim_ml.cli train-student-simulator `
+  --train-file "ml_data/student_sim_train.jsonl" `
+  --output-model "ml_models/student_sim_model.json"
 ```
 
-### 강사 승인 워크플로우
+3) 실행 시 적용
 
-1) 초안 생성
-
-```bash
-python -m edu_sim.cli draft-plan \
-  --lecture-package-file sample_data/lecture_package.json \
-  --lecture-title "승인 대상 강의" \
-  --db-path edu_sim_store.json \
-  --output plan_draft.json
+```powershell
+python -m edu_sim.cli run `
+  --lecture-file "sample_data/lecture.txt" `
+  --students-file "sample_data/students_synthetic.json" `
+  --student-model-path "ml_models/student_sim_model.json" `
+  --lecture-title "trained student simulator run" `
+  --output "result_trained_student_model.json"
 ```
 
-2) `plan_draft.json` 수정(강사 검토)
+## 면접관 LLM 파인튜닝 파이프라인
 
-3) 승인
+1) 파인튜닝용 chat JSONL 생성
 
-```bash
-python -m edu_sim.cli approve-plan \
-  --plan-file plan_draft.json \
-  --approved-by "instructor_kim" \
-  --approval-notes "1차 승인" \
-  --db-path edu_sim_store.json
+```powershell
+python -m edu_sim_ml.cli build-interviewer-ft `
+  --store-file "edu_sim_store.json" `
+  --train-output "ml_data/interviewer_ft_train.jsonl" `
+  --valid-output "ml_data/interviewer_ft_valid.jsonl"
 ```
 
-4) 승인 플랜으로 실행
+2) OpenAI 파인튜닝 잡 생성
 
-```bash
-python -m edu_sim.cli run \
-  --lecture-package-file sample_data/lecture_package.json \
-  --students-file sample_data/students.json \
-  --lecture-title "승인 적용 실행" \
-  --approved-plan-id <plan_id> \
-  --db-path edu_sim_store.json \
-  --output result_approved.json
+```powershell
+$env:OPENAI_API_KEY = "<YOUR_KEY>"
+
+python -m edu_sim_ml.cli train-interviewer-ft-openai `
+  --train-file "ml_data/interviewer_ft_train.jsonl" `
+  --valid-file "ml_data/interviewer_ft_valid.jsonl" `
+  --base-model "gpt-4o-mini-2024-07-18" `
+  --suffix "evalbuddy-interviewer" `
+  --output-info "ml_models/interviewer_ft_job.json"
 ```
 
-### 결과 조회
+`ml_models/interviewer_ft_job.json`에 `fine_tune_job_id`, 업로드 파일 ID가 저장됩니다.
 
-```bash
-python -m edu_sim.cli show-run --run-id <run_id> --db-path edu_sim_store.json
-python -m edu_sim.cli show-plan --plan-id <plan_id> --db-path edu_sim_store.json
+## AI-Hub 데이터 처리
+
+샘플 경로: `D:\KIT\edu_sim\Sample\Sample`
+
+manifest 생성:
+
+```powershell
+python -m edu_sim_ml.cli build-manifest `
+  --dataset-root "D:\KIT\edu_sim\Sample\Sample" `
+  --output "ml_data/manifest.jsonl"
+```
+
+lecture package 변환:
+
+```powershell
+python -m edu_sim_ml.cli build-lecture-packages `
+  --dataset-root "D:\KIT\edu_sim\Sample\Sample" `
+  --output-dir "ml_data/lecture_packages"
+```
+
+## 웹 + Vercel 배포
+
+`vercel.json`은 아래를 이미 설정합니다.
+
+- `/api/*` -> `api/index.py`
+- 나머지 경로 -> `web/index.html`
+
+필수 환경변수(LLM 면접 모드 사용 시):
+
+- `OPENAI_API_KEY`
+
+배포:
+
+```powershell
+vercel
+vercel --prod
 ```
 
 ## 테스트
 
-```bash
+```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
-

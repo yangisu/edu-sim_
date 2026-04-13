@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EvalBuddy - 교육 평가 보조 AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-a: #eef7f1;
+        --bg-b: #f9fbf1;
+        --ink: #1d2d29;
+        --muted: #4d605a;
+        --line: #bed2c9;
+        --card: rgba(255, 255, 255, 0.8);
+        --accent: #145f4a;
+        --accent-2: #e2a72e;
+        --danger: #9f2f2f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: "IBM Plex Sans KR", sans-serif;
+        background: radial-gradient(circle at 10% 10%, #dbeee2 0, transparent 35%),
+          radial-gradient(circle at 90% 80%, #fff0d2 0, transparent 32%),
+          linear-gradient(160deg, var(--bg-a), var(--bg-b));
+        min-height: 100vh;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+      .hero {
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--card);
+        backdrop-filter: blur(6px);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(1.6rem, 2.8vw, 2.4rem);
+      }
+      .sub {
+        margin: 0;
+        color: var(--muted);
+      }
+      .grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: 1.2fr 0.8fr;
+        }
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--card);
+        padding: 16px;
+      }
+      label {
+        display: block;
+        font-size: 0.92rem;
+        margin-bottom: 6px;
+        color: var(--muted);
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+        background: #fff;
+        color: var(--ink);
+      }
+      textarea {
+        min-height: 180px;
+        resize: vertical;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      @media (min-width: 600px) {
+        .row {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .student-mode {
+        display: flex;
+        gap: 8px;
+      }
+      .chip {
+        flex: 1;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 8px 12px;
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+        transition: 140ms ease;
+      }
+      .chip.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        flex: 1;
+      }
+      .btn-ghost {
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+      .status {
+        margin-top: 12px;
+        min-height: 20px;
+        font-size: 0.94rem;
+      }
+      .status.error {
+        color: var(--danger);
+      }
+      .summary {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        background: #fff;
+      }
+      .metric b {
+        display: block;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.1rem;
+        margin-top: 3px;
+      }
+      pre {
+        margin: 14px 0 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fbfffc;
+        overflow: auto;
+        max-height: 480px;
+        font-size: 0.86rem;
+      }
+      .hint {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1>EvalBuddy</h1>
+        <p class="sub">
+          강의 텍스트를 입력하고, 특정 학생 또는 가상 학생 그룹에 대해 사전/사후 성취와 AI 면접 평가를 시뮬레이션합니다.
+        </p>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <label for="title">강의 제목</label>
+          <input id="title" value="파이썬 데이터 분석 입문" />
+
+          <label for="lecture" style="margin-top: 12px">강의 본문</label>
+          <textarea id="lecture">
+판다스를 사용한 데이터 처리의 핵심은 결측치 처리, 그룹화, 집계입니다.
+이번 수업에서는 결측치 제거와 대체 전략을 비교하고, groupby 기반 집계를 실습합니다.</textarea
+          >
+
+          <div style="margin-top: 12px">
+            <label>학생 시뮬레이션 모드</label>
+            <div class="student-mode">
+              <button class="chip active" id="mode-specific" type="button">특정 학생</button>
+              <button class="chip" id="mode-synthetic" type="button">가상 그룹</button>
+            </div>
+          </div>
+
+          <div id="specific-box" class="row" style="margin-top: 10px">
+            <div>
+              <label for="s-name">학생 이름</label>
+              <input id="s-name" value="김학생" />
+            </div>
+            <div>
+              <label for="s-id">학생 ID</label>
+              <input id="s-id" value="stu_kim_001" />
+            </div>
+            <div>
+              <label for="s-know">지식 수준(0~100)</label>
+              <input id="s-know" type="number" value="52" />
+            </div>
+            <div>
+              <label for="s-iq">지능/이해력(0~100)</label>
+              <input id="s-iq" type="number" value="67" />
+            </div>
+          </div>
+
+          <div id="synthetic-box" class="row" style="margin-top: 10px; display: none">
+            <div>
+              <label for="g-count">학생 수</label>
+              <input id="g-count" type="number" value="20" />
+            </div>
+            <div>
+              <label for="g-know">평균 지식 수준</label>
+              <input id="g-know" type="number" value="50" />
+            </div>
+            <div>
+              <label for="g-iq">평균 지능/이해력</label>
+              <input id="g-iq" type="number" value="58" />
+            </div>
+            <div>
+              <label for="g-spread">분산(지식/지능)</label>
+              <input id="g-spread" type="number" value="10" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top: 10px">
+            <div>
+              <label for="quality">강의 품질(0~1)</label>
+              <input id="quality" type="number" step="0.01" value="0.82" />
+            </div>
+            <div>
+              <label for="difficulty">강의 난이도(0~1)</label>
+              <input id="difficulty" type="number" step="0.01" value="0.55" />
+            </div>
+            <div>
+              <label for="interview">면접 평가 모드</label>
+              <select id="interview">
+                <option value="rule">rule</option>
+                <option value="llm">llm</option>
+              </select>
+            </div>
+            <div>
+              <label for="student-model">학생 모델 경로(선택)</label>
+              <input id="student-model" value="ml_models/student_sim_model.json" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="run" class="btn-primary">시뮬레이션 실행</button>
+            <button id="sample" class="btn-ghost">샘플 로드</button>
+          </div>
+          <p class="hint">
+            `llm` 모드는 서버 환경변수 `OPENAI_API_KEY`가 있어야 동작합니다.
+          </p>
+        </section>
+
+        <section class="panel">
+          <div id="status" class="status">대기 중</div>
+          <div class="summary">
+            <div class="metric">
+              run_id
+              <b id="m-run">-</b>
+            </div>
+            <div class="metric">
+              objective_count
+              <b id="m-obj">-</b>
+            </div>
+            <div class="metric">
+              student_engine
+              <b id="m-student">-</b>
+            </div>
+            <div class="metric">
+              interview_engine
+              <b id="m-interview">-</b>
+            </div>
+          </div>
+          <pre id="out">실행 결과가 여기에 표시됩니다.</pre>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      let mode = "specific";
+      const statusEl = document.getElementById("status");
+      const outEl = document.getElementById("out");
+
+      const specificBtn = document.getElementById("mode-specific");
+      const syntheticBtn = document.getElementById("mode-synthetic");
+      const specificBox = document.getElementById("specific-box");
+      const syntheticBox = document.getElementById("synthetic-box");
+
+      specificBtn.addEventListener("click", () => setMode("specific"));
+      syntheticBtn.addEventListener("click", () => setMode("synthetic"));
+
+      function setMode(next) {
+        mode = next;
+        specificBtn.classList.toggle("active", next === "specific");
+        syntheticBtn.classList.toggle("active", next === "synthetic");
+        specificBox.style.display = next === "specific" ? "grid" : "none";
+        syntheticBox.style.display = next === "synthetic" ? "grid" : "none";
+      }
+
+      document.getElementById("sample").addEventListener("click", async () => {
+        try {
+          const res = await fetch("/api/sample-payload");
+          const data = await res.json();
+          document.getElementById("title").value = data.lecture_title || "";
+          document.getElementById("lecture").value = data.lecture_content || "";
+          document.getElementById("quality").value = data.config?.lecture_quality ?? 0.8;
+          document.getElementById("difficulty").value = data.config?.lecture_difficulty ?? 0.5;
+          document.getElementById("interview").value = data.config?.interview_mode ?? "rule";
+          document.getElementById("student-model").value = data.config?.student_model_path ?? "";
+          setMode(data.student_generator?.mode === "specific" ? "specific" : "synthetic");
+          status("샘플 페이로드를 불러왔습니다.");
+        } catch (err) {
+          status("샘플 로딩 실패: " + err.message, true);
+        }
+      });
+
+      document.getElementById("run").addEventListener("click", runSimulation);
+
+      async function runSimulation() {
+        status("실행 중...");
+        const payload = {
+          lecture_title: document.getElementById("title").value.trim(),
+          lecture_content: document.getElementById("lecture").value.trim(),
+          config: {
+            lecture_quality: Number(document.getElementById("quality").value || 0.8),
+            lecture_difficulty: Number(document.getElementById("difficulty").value || 0.5),
+            interview_mode: document.getElementById("interview").value,
+            student_model_path: document.getElementById("student-model").value.trim(),
+          },
+        };
+        if (!payload.config.student_model_path) {
+          delete payload.config.student_model_path;
+        }
+
+        if (mode === "specific") {
+          payload.student_generator = {
+            mode: "specific",
+            student_id: document.getElementById("s-id").value.trim(),
+            name: document.getElementById("s-name").value.trim(),
+            knowledge_level_100: Number(document.getElementById("s-know").value || 50),
+            intelligence_level_100: Number(document.getElementById("s-iq").value || 50),
+          };
+        } else {
+          const spread = Number(document.getElementById("g-spread").value || 10);
+          payload.student_generator = {
+            mode: "synthetic",
+            count: Number(document.getElementById("g-count").value || 20),
+            knowledge_level_100: Number(document.getElementById("g-know").value || 50),
+            intelligence_level_100: Number(document.getElementById("g-iq").value || 55),
+            knowledge_spread: spread,
+            intelligence_spread: spread,
+          };
+        }
+
+        try {
+          const res = await fetch("/api/simulate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data.message || data.error || "요청 실패");
+          }
+          const report = data.report;
+          document.getElementById("m-run").textContent = report.run_id || "-";
+          document.getElementById("m-obj").textContent = String(report.lecture?.objective_count ?? "-");
+          document.getElementById("m-student").textContent = report.student_simulator_engine || "-";
+          document.getElementById("m-interview").textContent = report.interview_engine_used || "-";
+          outEl.textContent = JSON.stringify(report, null, 2);
+          status("완료");
+        } catch (err) {
+          status("실행 실패: " + err.message, true);
+        }
+      }
+
+      function status(text, isError = false) {
+        statusEl.textContent = text;
+        statusEl.classList.toggle("error", isError);
+      }
+    </script>
+  </body>
+</html>

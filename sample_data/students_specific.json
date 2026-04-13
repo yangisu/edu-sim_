@@ -1,0 +1,18 @@
+[
+  {
+    "id": "stu_kim_01",
+    "name": "김학생",
+    "mode": "specific",
+    "level": "intermediate",
+    "knowledge_level_100": 62.0,
+    "intelligence_level_100": 74.0,
+    "traits": {},
+    "strengths": [
+      "개념이해",
+      "메타인지"
+    ],
+    "weaknesses": [
+      "응용문항"
+    ]
+  }
+]

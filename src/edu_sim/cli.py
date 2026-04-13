@@ -9,23 +9,16 @@ from .models import StudentProfile
 from .orchestrator import WorkflowService
 from .plan_service import InstructorPlanService, PlanValidationError
 from .repository import Repository
+from .student_profile_factory import (
+    create_specific_student_row,
+    create_synthetic_students,
+    parse_student_row,
+)
 
 
 def _load_students(path: Path) -> list[StudentProfile]:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    students: list[StudentProfile] = []
-    for row in raw:
-        students.append(
-            StudentProfile(
-                id=row["id"],
-                name=row["name"],
-                level=row["level"],
-                traits=row.get("traits", {}),
-                strengths=row.get("strengths", []),
-                weaknesses=row.get("weaknesses", []),
-            )
-        )
-    return students
+    return [parse_student_row(row) for row in raw]
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -87,6 +80,8 @@ def _print_summary(report: dict[str, Any]) -> None:
     print(f"run_id: {report['run_id']}")
     print(f"lecture: {report['lecture']['title']} (objectives={report['lecture']['objective_count']})")
     print(f"input_format: {report['lecture']['input_format']}")
+    print(f"student_simulator_engine: {report.get('student_simulator_engine', 'rule')}")
+    print(f"interview_engine_used: {report.get('interview_engine_used', 'rule')}")
     print("group summary:")
     for level, summary in report["group_summary"].items():
         print(
@@ -102,11 +97,15 @@ def _require_lecture_source(args: argparse.Namespace) -> None:
         raise SystemExit("exactly one of --lecture-file or --lecture-package-file is required")
 
 
+def _split_csv(value: str) -> list[str]:
+    return [x.strip() for x in value.split(",") if x.strip()]
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="edu_sim MVP CLI")
+    parser = argparse.ArgumentParser(description="edu_sim CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run_demo = sub.add_parser("run-demo", help="sample_data 기준으로 데모 실행")
+    run_demo = sub.add_parser("run-demo", help="sample_data로 데모 실행")
     run_demo.add_argument("--db-path", default="edu_sim_store.json")
     run_demo.add_argument("--output", default="")
 
@@ -121,8 +120,12 @@ def main() -> None:
     run.add_argument("--lecture-difficulty", type=float, default=0.5)
     run.add_argument("--max-objectives", type=int, default=5)
     run.add_argument("--approved-plan-id", default="")
+    run.add_argument("--student-model-path", default="")
+    run.add_argument("--interview-mode", choices=["rule", "llm"], default="rule")
+    run.add_argument("--llm-model", default="gpt-4o-mini")
+    run.add_argument("--llm-api-key", default="")
 
-    draft_plan = sub.add_parser("draft-plan", help="강의에서 목표/키워드/루브릭 초안 생성")
+    draft_plan = sub.add_parser("draft-plan", help="강의에서 objective/rubric 초안 생성")
     draft_plan.add_argument("--lecture-file", default="")
     draft_plan.add_argument("--lecture-package-file", default="")
     draft_plan.add_argument("--lecture-title", default="사용자 강의")
@@ -130,22 +133,74 @@ def main() -> None:
     draft_plan.add_argument("--output", default="plan_draft.json")
     draft_plan.add_argument("--max-objectives", type=int, default=5)
 
-    approve_plan = sub.add_parser("approve-plan", help="수정된 plan JSON을 검증 후 승인")
+    approve_plan = sub.add_parser("approve-plan", help="수정한 plan JSON 검증 후 승인")
     approve_plan.add_argument("--plan-file", required=True)
     approve_plan.add_argument("--db-path", default="edu_sim_store.json")
     approve_plan.add_argument("--approved-by", default="instructor")
     approve_plan.add_argument("--approval-notes", default="")
     approve_plan.add_argument("--output", default="")
 
-    show_plan = sub.add_parser("show-plan", help="기존 plan 조회")
+    show_plan = sub.add_parser("show-plan", help="plan 조회")
     show_plan.add_argument("--plan-id", required=True)
     show_plan.add_argument("--db-path", default="edu_sim_store.json")
 
-    show = sub.add_parser("show-run", help="기존 run_id 결과 조회")
-    show.add_argument("--run-id", required=True)
-    show.add_argument("--db-path", default="edu_sim_store.json")
+    show_run = sub.add_parser("show-run", help="run 결과 조회")
+    show_run.add_argument("--run-id", required=True)
+    show_run.add_argument("--db-path", default="edu_sim_store.json")
+
+    make_specific = sub.add_parser("make-specific-student", help="특정 학생 시뮬레이션용 프로필 생성")
+    make_specific.add_argument("--student-id", required=True)
+    make_specific.add_argument("--name", required=True)
+    make_specific.add_argument("--knowledge-level", type=float, required=True)
+    make_specific.add_argument("--intelligence-level", type=float, required=True)
+    make_specific.add_argument("--level", default="")
+    make_specific.add_argument("--strengths", default="")
+    make_specific.add_argument("--weaknesses", default="")
+    make_specific.add_argument("--output", required=True)
+
+    make_synthetic = sub.add_parser("make-synthetic-students", help="정량 수준 기반 가상 학생 집합 생성")
+    make_synthetic.add_argument("--count", type=int, required=True)
+    make_synthetic.add_argument("--knowledge-level", type=float, required=True)
+    make_synthetic.add_argument("--intelligence-level", type=float, required=True)
+    make_synthetic.add_argument("--knowledge-spread", type=float, default=8.0)
+    make_synthetic.add_argument("--intelligence-spread", type=float, default=8.0)
+    make_synthetic.add_argument("--prefix", default="sim_student")
+    make_synthetic.add_argument("--seed", type=int, default=42)
+    make_synthetic.add_argument("--output", required=True)
 
     args = parser.parse_args()
+
+    if args.command == "make-specific-student":
+        row = create_specific_student_row(
+            student_id=args.student_id,
+            name=args.name,
+            knowledge_level_100=args.knowledge_level,
+            intelligence_level_100=args.intelligence_level,
+            level=(args.level or None),
+            strengths=_split_csv(args.strengths),
+            weaknesses=_split_csv(args.weaknesses),
+        )
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps([row], ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"saved: {out}")
+        return
+
+    if args.command == "make-synthetic-students":
+        rows = create_synthetic_students(
+            count=args.count,
+            base_knowledge_level_100=args.knowledge_level,
+            base_intelligence_level_100=args.intelligence_level,
+            knowledge_spread=args.knowledge_spread,
+            intelligence_spread=args.intelligence_spread,
+            prefix=args.prefix,
+            seed=args.seed,
+        )
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"saved: {out}")
+        return
 
     if args.command == "draft-plan":
         _require_lecture_source(args)
@@ -164,12 +219,11 @@ def main() -> None:
                 lecture_content=lecture_content,
                 max_objectives=args.max_objectives,
             )
-
-        output_path = Path(args.output)
-        _save_json(output_path, plan)
+        out = Path(args.output)
+        _save_json(out, plan)
         print(f"plan_id: {plan['plan_id']}")
         print(f"status: {plan['status']}")
-        print(f"saved: {output_path}")
+        print(f"saved: {out}")
         print("next: edit the file, then run approve-plan")
         return
 
@@ -185,14 +239,13 @@ def main() -> None:
             )
         except PlanValidationError as exc:
             raise SystemExit(str(exc)) from exc
-
         print(f"plan_id: {approved['plan_id']}")
         print(f"status: {approved['status']}")
         print(f"approved_by: {approved['approved_by']}")
         if args.output:
-            output_path = Path(args.output)
-            _save_json(output_path, approved)
-            print(f"saved: {output_path}")
+            out = Path(args.output)
+            _save_json(out, approved)
+            print(f"saved: {out}")
         return
 
     if args.command == "show-plan":
@@ -216,9 +269,9 @@ def main() -> None:
         )
         _print_summary(report)
         if args.output:
-            output_path = Path(args.output)
-            _save_json(output_path, report)
-            print(f"saved: {output_path}")
+            out = Path(args.output)
+            _save_json(out, report)
+            print(f"saved: {out}")
         return
 
     if args.command == "run":
@@ -229,9 +282,15 @@ def main() -> None:
             "lecture_quality": args.lecture_quality,
             "lecture_difficulty": args.lecture_difficulty,
             "max_objectives": args.max_objectives,
+            "interview_mode": args.interview_mode,
+            "llm_model": args.llm_model,
         }
+        if args.llm_api_key:
+            config["llm_api_key"] = args.llm_api_key
         if args.approved_plan_id:
             config["approved_plan_id"] = args.approved_plan_id
+        if args.student_model_path:
+            config["student_model_path"] = args.student_model_path
 
         report = _run_pipeline(
             lecture_title=args.lecture_title,
@@ -243,9 +302,9 @@ def main() -> None:
         )
         _print_summary(report)
         if args.output:
-            output_path = Path(args.output)
-            _save_json(output_path, report)
-            print(f"saved: {output_path}")
+            out = Path(args.output)
+            _save_json(out, report)
+            print(f"saved: {out}")
         return
 
     if args.command == "show-run":
