@@ -108,24 +108,4 @@ python -m edu_sim_ml.cli build-lecture-packages `
 
 ## 웹 + Vercel 배포
 
-`vercel.json`은 아래를 이미 설정합니다.
-
-- `/api/*` -> `api/index.py`
-- 나머지 경로 -> `web/index.html`
-
-필수 환경변수(LLM 면접 모드 사용 시):
-
-- `OPENAI_API_KEY`
-
-배포:
-
-```powershell
-vercel
-vercel --prod
-```
-
-## 테스트
-
-```powershell
-python -m unittest discover -s tests -p "test_*.py" -v
-```
+https://edu-sim-158r.vercel.app/
