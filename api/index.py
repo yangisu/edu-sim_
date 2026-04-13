@@ -197,6 +197,5 @@ def _sample_payload() -> dict[str, Any]:
             "lecture_difficulty": 0.5,
             "max_objectives": 5,
             "interview_mode": "rule",
-            "student_model_path": "ml_models/student_sim_model.json",
         },
     }

@@ -270,7 +270,11 @@
             </div>
             <div>
               <label for="student-model">학생 모델 경로(선택)</label>
-              <input id="student-model" value="ml_models/student_sim_model.json" />
+              <input id="student-model" value="" placeholder="예: ml_models/student_sim_model.json" />
+            </div>
+            <div>
+              <label for="api-key">OpenAI API Key(임시 입력)</label>
+              <input id="api-key" type="password" placeholder="sk-..." autocomplete="off" />
             </div>
           </div>
 
@@ -339,6 +343,7 @@
           document.getElementById("difficulty").value = data.config?.lecture_difficulty ?? 0.5;
           document.getElementById("interview").value = data.config?.interview_mode ?? "rule";
           document.getElementById("student-model").value = data.config?.student_model_path ?? "";
+          document.getElementById("api-key").value = "";
           setMode(data.student_generator?.mode === "specific" ? "specific" : "synthetic");
           status("샘플 페이로드를 불러왔습니다.");
         } catch (err) {
@@ -362,6 +367,10 @@
         };
         if (!payload.config.student_model_path) {
           delete payload.config.student_model_path;
+        }
+        const apiKey = document.getElementById("api-key").value.trim();
+        if (apiKey) {
+          payload.config.llm_api_key = apiKey;
         }
 
         if (mode === "specific") {
