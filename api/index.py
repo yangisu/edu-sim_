@@ -47,7 +47,7 @@ class handler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if path == "/api/sample-payload":
+        if path in {"/api/sample-payload", "/api/sample"}:
             self._send_json(200, _sample_payload())
             return
         if not path.startswith("/api/"):
