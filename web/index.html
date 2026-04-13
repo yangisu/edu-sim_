@@ -17,9 +17,8 @@
         --ink: #1d2d29;
         --muted: #4d605a;
         --line: #bed2c9;
-        --card: rgba(255, 255, 255, 0.8);
+        --card: rgba(255, 255, 255, 0.84);
         --accent: #145f4a;
-        --accent-2: #e2a72e;
         --danger: #9f2f2f;
       }
       * {
@@ -35,7 +34,7 @@
         min-height: 100vh;
       }
       .wrap {
-        max-width: 1100px;
+        max-width: 1140px;
         margin: 0 auto;
         padding: 24px 16px 40px;
       }
@@ -44,7 +43,6 @@
         border: 1px solid var(--line);
         border-radius: 18px;
         background: var(--card);
-        backdrop-filter: blur(6px);
       }
       h1 {
         margin: 0 0 8px;
@@ -61,7 +59,7 @@
         grid-template-columns: 1fr;
         gap: 12px;
       }
-      @media (min-width: 900px) {
+      @media (min-width: 980px) {
         .grid {
           grid-template-columns: 1.2fr 0.8fr;
         }
@@ -71,6 +69,11 @@
         border-radius: 16px;
         background: var(--card);
         padding: 16px;
+      }
+      .section-title {
+        margin: 4px 0 10px;
+        font-size: 0.98rem;
+        color: var(--muted);
       }
       label {
         display: block;
@@ -90,7 +93,7 @@
         color: var(--ink);
       }
       textarea {
-        min-height: 180px;
+        min-height: 170px;
         resize: vertical;
       }
       .row {
@@ -98,7 +101,7 @@
         grid-template-columns: 1fr;
         gap: 10px;
       }
-      @media (min-width: 600px) {
+      @media (min-width: 640px) {
         .row {
           grid-template-columns: 1fr 1fr;
         }
@@ -115,7 +118,6 @@
         text-align: center;
         cursor: pointer;
         user-select: none;
-        transition: 140ms ease;
       }
       .chip.active {
         background: var(--accent);
@@ -152,7 +154,7 @@
         color: var(--danger);
       }
       .summary {
-        margin-top: 14px;
+        margin-top: 12px;
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 8px;
@@ -162,27 +164,39 @@
         border-radius: 12px;
         padding: 10px;
         background: #fff;
+        font-size: 0.88rem;
+        color: var(--muted);
       }
       .metric b {
         display: block;
         font-family: "Space Grotesk", sans-serif;
-        font-size: 1.1rem;
-        margin-top: 3px;
+        font-size: 1rem;
+        margin-top: 4px;
+        color: var(--ink);
+      }
+      .explain {
+        margin-top: 10px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        font-size: 0.87rem;
+        color: var(--muted);
+        background: #fff;
       }
       pre {
-        margin: 14px 0 0;
+        margin: 12px 0 0;
         padding: 12px;
         border: 1px solid var(--line);
-        border-radius: 14px;
+        border-radius: 12px;
         background: #fbfffc;
         overflow: auto;
-        max-height: 480px;
-        font-size: 0.86rem;
+        max-height: 420px;
+        font-size: 0.84rem;
       }
       .hint {
         margin-top: 8px;
         color: var(--muted);
-        font-size: 0.88rem;
+        font-size: 0.86rem;
       }
     </style>
   </head>
@@ -191,7 +205,7 @@
       <section class="hero">
         <h1>EvalBuddy</h1>
         <p class="sub">
-          강의 텍스트를 입력하고, 특정 학생 또는 가상 학생 그룹에 대해 사전/사후 성취와 AI 면접 평가를 시뮬레이션합니다.
+          입력은 상태 기반(배경지식/이해도/강의품질/강의난이도)으로 받고, 내부에서 정량값으로 변환해 시뮬레이션합니다.
         </p>
       </section>
 
@@ -206,12 +220,10 @@
 이번 수업에서는 결측치 제거와 대체 전략을 비교하고, groupby 기반 집계를 실습합니다.</textarea
           >
 
-          <div style="margin-top: 12px">
-            <label>학생 시뮬레이션 모드</label>
-            <div class="student-mode">
-              <button class="chip active" id="mode-specific" type="button">특정 학생</button>
-              <button class="chip" id="mode-synthetic" type="button">가상 그룹</button>
-            </div>
+          <p class="section-title">학생 시뮬레이션 대상</p>
+          <div class="student-mode">
+            <button class="chip active" id="mode-specific" type="button">특정 학생</button>
+            <button class="chip" id="mode-synthetic" type="button">가상 그룹</button>
           </div>
 
           <div id="specific-box" class="row" style="margin-top: 10px">
@@ -224,12 +236,23 @@
               <input id="s-id" value="stu_kim_001" />
             </div>
             <div>
-              <label for="s-know">지식 수준(0~100)</label>
-              <input id="s-know" type="number" value="52" />
+              <label for="s-bg">배경지식 상태</label>
+              <select id="s-bg">
+                <option value="no_prereq">강의 이해에 필요한 배경지식을 학습하지 않은 상태</option>
+                <option value="partial_prereq" selected>강의 이해에 필요한 배경지식을 약간 학습한 상태</option>
+                <option value="complete_prereq">강의 이해에 필요한 배경지식을 모두 학습한 상태</option>
+                <option value="already_understand_topic">강의 내용을 이미 이해하고 있는 상태</option>
+              </select>
             </div>
             <div>
-              <label for="s-iq">지능/이해력(0~100)</label>
-              <input id="s-iq" type="number" value="67" />
+              <label for="s-understanding">이해도 상태</label>
+              <select id="s-understanding">
+                <option value="needs_extra_time_and_explanation">
+                  설명한 내용을 이해시키기 위해 추가 시간 및 부가설명이 필요함
+                </option>
+                <option value="needs_time_only" selected>부가설명은 불필요하지만 약간의 시간이 필요함</option>
+                <option value="understands_immediately">시간 및 추가 설명이 필요하지 않음</option>
+              </select>
             </div>
           </div>
 
@@ -239,41 +262,63 @@
               <input id="g-count" type="number" value="20" />
             </div>
             <div>
-              <label for="g-know">평균 지식 수준</label>
-              <input id="g-know" type="number" value="50" />
-            </div>
-            <div>
-              <label for="g-iq">평균 지능/이해력</label>
-              <input id="g-iq" type="number" value="58" />
-            </div>
-            <div>
-              <label for="g-spread">분산(지식/지능)</label>
-              <input id="g-spread" type="number" value="10" />
-            </div>
-          </div>
-
-          <div class="row" style="margin-top: 10px">
-            <div>
-              <label for="quality">강의 품질(0~1)</label>
-              <input id="quality" type="number" step="0.01" value="0.82" />
-            </div>
-            <div>
-              <label for="difficulty">강의 난이도(0~1)</label>
-              <input id="difficulty" type="number" step="0.01" value="0.55" />
-            </div>
-            <div>
-              <label for="interview">면접 평가 모드</label>
-              <select id="interview">
-                <option value="rule">rule</option>
-                <option value="llm">llm</option>
+              <label for="g-bg">평균 배경지식 상태</label>
+              <select id="g-bg">
+                <option value="no_prereq">강의 이해에 필요한 배경지식을 학습하지 않은 상태</option>
+                <option value="partial_prereq" selected>강의 이해에 필요한 배경지식을 약간 학습한 상태</option>
+                <option value="complete_prereq">강의 이해에 필요한 배경지식을 모두 학습한 상태</option>
+                <option value="already_understand_topic">강의 내용을 이미 이해하고 있는 상태</option>
               </select>
             </div>
             <div>
-              <label for="student-model">학생 모델 경로(선택)</label>
-              <input id="student-model" value="" placeholder="예: ml_models/student_sim_model.json" />
+              <label for="g-understanding">평균 이해도 상태</label>
+              <select id="g-understanding">
+                <option value="needs_extra_time_and_explanation">
+                  설명한 내용을 이해시키기 위해 추가 시간 및 부가설명이 필요함
+                </option>
+                <option value="needs_time_only" selected>부가설명은 불필요하지만 약간의 시간이 필요함</option>
+                <option value="understands_immediately">시간 및 추가 설명이 필요하지 않음</option>
+              </select>
             </div>
             <div>
-              <label for="api-key">OpenAI API Key(임시 입력)</label>
+              <label for="g-var">학습자 편차</label>
+              <select id="g-var">
+                <option value="low">편차 작음</option>
+                <option value="medium" selected>편차 보통</option>
+                <option value="high">편차 큼</option>
+              </select>
+            </div>
+          </div>
+
+          <p class="section-title">강의/평가 조건</p>
+          <div class="row">
+            <div>
+              <label for="quality-state">강의 품질</label>
+              <select id="quality-state">
+                <option value="low_structure">핵심 개념 전달이 불명확하고 예시/정리가 부족함</option>
+                <option value="basic_structure">핵심 개념은 전달되나 설명 구조와 예시가 제한적임</option>
+                <option value="clear_with_examples" selected>핵심 개념, 예시, 정리가 명확하게 연결됨</option>
+                <option value="highly_effective">학습목표-설명-예시-정리 흐름이 매우 우수함</option>
+              </select>
+            </div>
+            <div>
+              <label for="difficulty-state">강의 난이도</label>
+              <select id="difficulty-state">
+                <option value="easy_for_average">평균적인 수준의 학생에게 쉬운 강의</option>
+                <option value="appropriate_for_average" selected>평균적인 수준의 학생에게 적정한 강의</option>
+                <option value="hard_for_average">평균적인 수준의 학생에게 다소 어려운 강의</option>
+                <option value="very_hard_for_average">평균적인 수준의 학생에게 매우 어려운 강의</option>
+              </select>
+            </div>
+            <div>
+              <label for="interview">면접 평가 방식</label>
+              <select id="interview">
+                <option value="rule" selected>규칙 기반</option>
+                <option value="llm">LLM 기반</option>
+              </select>
+            </div>
+            <div>
+              <label for="api-key">OpenAI API Key (임시 테스트 입력)</label>
               <input id="api-key" type="password" placeholder="sk-..." autocomplete="off" />
             </div>
           </div>
@@ -283,7 +328,7 @@
             <button id="sample" class="btn-ghost">샘플 로드</button>
           </div>
           <p class="hint">
-            `llm` 모드는 서버 환경변수 `OPENAI_API_KEY`가 있어야 동작합니다.
+            학생 모델은 서버에서 자동 감지합니다(`ml_models/student_sim_model.json` 또는 `STUDENT_MODEL_PATH`).
           </p>
         </section>
 
@@ -291,21 +336,28 @@
           <div id="status" class="status">대기 중</div>
           <div class="summary">
             <div class="metric">
-              run_id
+              실행 ID
               <b id="m-run">-</b>
             </div>
             <div class="metric">
-              objective_count
+              학습목표 수
               <b id="m-obj">-</b>
             </div>
             <div class="metric">
-              student_engine
+              학생 시뮬레이터 방식
               <b id="m-student">-</b>
             </div>
             <div class="metric">
-              interview_engine
+              면접 평가 방식
               <b id="m-interview">-</b>
             </div>
+            <div class="metric">
+              결과 포맷 버전
+              <b id="m-format">-</b>
+            </div>
+          </div>
+          <div class="explain" id="m-explain">
+            실행 결과는 `group_summary`(집단 통계), `student_reports`(개별 결과), `execution_meta`(실행 엔진 설명)로 구성됩니다.
           </div>
           <pre id="out">실행 결과가 여기에 표시됩니다.</pre>
         </section>
@@ -316,7 +368,6 @@
       let mode = "specific";
       const statusEl = document.getElementById("status");
       const outEl = document.getElementById("out");
-
       const specificBtn = document.getElementById("mode-specific");
       const syntheticBtn = document.getElementById("mode-synthetic");
       const specificBox = document.getElementById("specific-box");
@@ -324,6 +375,8 @@
 
       specificBtn.addEventListener("click", () => setMode("specific"));
       syntheticBtn.addEventListener("click", () => setMode("synthetic"));
+      document.getElementById("sample").addEventListener("click", loadSample);
+      document.getElementById("run").addEventListener("click", runSimulation);
 
       function setMode(next) {
         mode = next;
@@ -333,25 +386,35 @@
         syntheticBox.style.display = next === "synthetic" ? "grid" : "none";
       }
 
-      document.getElementById("sample").addEventListener("click", async () => {
+      async function loadSample() {
         try {
           const res = await fetch("/api/sample");
           const data = await res.json();
           document.getElementById("title").value = data.lecture_title || "";
           document.getElementById("lecture").value = data.lecture_content || "";
-          document.getElementById("quality").value = data.config?.lecture_quality ?? 0.8;
-          document.getElementById("difficulty").value = data.config?.lecture_difficulty ?? 0.5;
-          document.getElementById("interview").value = data.config?.interview_mode ?? "rule";
-          document.getElementById("student-model").value = data.config?.student_model_path ?? "";
+          const sg = data.student_generator || {};
+          if ((sg.mode || "synthetic") === "specific") {
+            setMode("specific");
+            document.getElementById("s-bg").value = sg.background_knowledge_state || "partial_prereq";
+            document.getElementById("s-understanding").value = sg.understanding_state || "needs_time_only";
+          } else {
+            setMode("synthetic");
+            document.getElementById("g-count").value = sg.count ?? 20;
+            document.getElementById("g-bg").value = sg.background_knowledge_state || "partial_prereq";
+            document.getElementById("g-understanding").value = sg.understanding_state || "needs_time_only";
+            document.getElementById("g-var").value = sg.variability_state || "medium";
+          }
+          const cfg = data.config || {};
+          document.getElementById("quality-state").value = cfg.lecture_quality_state || "clear_with_examples";
+          document.getElementById("difficulty-state").value =
+            cfg.lecture_difficulty_state || "appropriate_for_average";
+          document.getElementById("interview").value = cfg.interview_mode || "rule";
           document.getElementById("api-key").value = "";
-          setMode(data.student_generator?.mode === "specific" ? "specific" : "synthetic");
           status("샘플 페이로드를 불러왔습니다.");
         } catch (err) {
           status("샘플 로딩 실패: " + err.message, true);
         }
-      });
-
-      document.getElementById("run").addEventListener("click", runSimulation);
+      }
 
       async function runSimulation() {
         status("실행 중...");
@@ -359,37 +422,31 @@
           lecture_title: document.getElementById("title").value.trim(),
           lecture_content: document.getElementById("lecture").value.trim(),
           config: {
-            lecture_quality: Number(document.getElementById("quality").value || 0.8),
-            lecture_difficulty: Number(document.getElementById("difficulty").value || 0.5),
+            lecture_quality_state: document.getElementById("quality-state").value,
+            lecture_difficulty_state: document.getElementById("difficulty-state").value,
             interview_mode: document.getElementById("interview").value,
-            student_model_path: document.getElementById("student-model").value.trim(),
+            max_objectives: 5,
           },
         };
-        if (!payload.config.student_model_path) {
-          delete payload.config.student_model_path;
-        }
+
         const apiKey = document.getElementById("api-key").value.trim();
-        if (apiKey) {
-          payload.config.llm_api_key = apiKey;
-        }
+        if (apiKey) payload.config.llm_api_key = apiKey;
 
         if (mode === "specific") {
           payload.student_generator = {
             mode: "specific",
             student_id: document.getElementById("s-id").value.trim(),
             name: document.getElementById("s-name").value.trim(),
-            knowledge_level_100: Number(document.getElementById("s-know").value || 50),
-            intelligence_level_100: Number(document.getElementById("s-iq").value || 50),
+            background_knowledge_state: document.getElementById("s-bg").value,
+            understanding_state: document.getElementById("s-understanding").value,
           };
         } else {
-          const spread = Number(document.getElementById("g-spread").value || 10);
           payload.student_generator = {
             mode: "synthetic",
             count: Number(document.getElementById("g-count").value || 20),
-            knowledge_level_100: Number(document.getElementById("g-know").value || 50),
-            intelligence_level_100: Number(document.getElementById("g-iq").value || 55),
-            knowledge_spread: spread,
-            intelligence_spread: spread,
+            background_knowledge_state: document.getElementById("g-bg").value,
+            understanding_state: document.getElementById("g-understanding").value,
+            variability_state: document.getElementById("g-var").value,
           };
         }
 
@@ -403,16 +460,25 @@
           if (!res.ok || !data.ok) {
             throw new Error(data.message || data.error || "요청 실패");
           }
-          const report = data.report;
-          document.getElementById("m-run").textContent = report.run_id || "-";
-          document.getElementById("m-obj").textContent = String(report.lecture?.objective_count ?? "-");
-          document.getElementById("m-student").textContent = report.student_simulator_engine || "-";
-          document.getElementById("m-interview").textContent = report.interview_engine_used || "-";
-          outEl.textContent = JSON.stringify(report, null, 2);
+          renderReport(data.report);
           status("완료");
         } catch (err) {
           status("실행 실패: " + err.message, true);
         }
+      }
+
+      function renderReport(report) {
+        document.getElementById("m-run").textContent = report.run_id || "-";
+        document.getElementById("m-obj").textContent = String(report.lecture?.objective_count ?? "-");
+        document.getElementById("m-student").textContent =
+          report.execution_meta?.student_simulator?.label || report.student_simulator_engine || "-";
+        document.getElementById("m-interview").textContent =
+          report.execution_meta?.interviewer?.label || report.interview_engine_used || "-";
+        document.getElementById("m-format").textContent = report.result_format?.version || "legacy";
+        document.getElementById("m-explain").textContent =
+          report.result_format?.description ||
+          "결과는 group_summary(집단), student_reports(개별), execution_meta(실행 방식)로 구성됩니다.";
+        outEl.textContent = JSON.stringify(report, null, 2);
       }
 
       function status(text, isError = false) {

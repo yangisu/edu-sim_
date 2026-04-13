@@ -25,6 +25,85 @@ from edu_sim.student_profile_factory import (  # noqa: E402
 )
 
 
+BACKGROUND_KNOWLEDGE_LEVELS: dict[str, dict[str, Any]] = {
+    "no_prereq": {
+        "label": "강의 이해에 필요한 배경지식을 학습하지 않은 상태",
+        "score_100": 22.0,
+    },
+    "partial_prereq": {
+        "label": "강의 이해에 필요한 배경지식을 약간 학습한 상태",
+        "score_100": 45.0,
+    },
+    "complete_prereq": {
+        "label": "강의 이해에 필요한 배경지식을 모두 학습한 상태",
+        "score_100": 70.0,
+    },
+    "already_understand_topic": {
+        "label": "강의 내용을 이미 이해하고 있는 상태",
+        "score_100": 90.0,
+    },
+}
+
+UNDERSTANDING_LEVELS: dict[str, dict[str, Any]] = {
+    "needs_extra_time_and_explanation": {
+        "label": "설명한 내용을 이해시키기 위해 추가 시간 및 부가설명이 필요함",
+        "score_100": 35.0,
+    },
+    "needs_time_only": {
+        "label": "부가설명은 불필요하지만 약간의 시간이 필요함",
+        "score_100": 60.0,
+    },
+    "understands_immediately": {
+        "label": "시간 및 추가 설명이 필요하지 않음",
+        "score_100": 85.0,
+    },
+}
+
+LECTURE_QUALITY_LEVELS: dict[str, dict[str, Any]] = {
+    "low_structure": {
+        "label": "핵심 개념 전달이 불명확하고 예시/정리가 부족함",
+        "score_01": 0.45,
+    },
+    "basic_structure": {
+        "label": "핵심 개념은 전달되나 설명 구조와 예시가 제한적임",
+        "score_01": 0.62,
+    },
+    "clear_with_examples": {
+        "label": "핵심 개념, 예시, 정리가 명확하게 연결됨",
+        "score_01": 0.80,
+    },
+    "highly_effective": {
+        "label": "학습목표-설명-예시-정리 흐름이 매우 우수함",
+        "score_01": 0.93,
+    },
+}
+
+LECTURE_DIFFICULTY_LEVELS: dict[str, dict[str, Any]] = {
+    "easy_for_average": {
+        "label": "평균적인 수준의 학생에게 쉬운 강의",
+        "score_01": 0.35,
+    },
+    "appropriate_for_average": {
+        "label": "평균적인 수준의 학생에게 적정한 강의",
+        "score_01": 0.50,
+    },
+    "hard_for_average": {
+        "label": "평균적인 수준의 학생에게 다소 어려운 강의",
+        "score_01": 0.68,
+    },
+    "very_hard_for_average": {
+        "label": "평균적인 수준의 학생에게 매우 어려운 강의",
+        "score_01": 0.82,
+    },
+}
+
+VARIABILITY_SPREAD_LEVELS: dict[str, float] = {
+    "low": 5.0,
+    "medium": 8.0,
+    "high": 12.0,
+}
+
+
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:  # noqa: N802
         self._send_json(204, {})
@@ -47,7 +126,7 @@ class handler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if path in {"/api/sample-payload", "/api/sample"}:
+        if path in {"/api/sample", "/api/sample-payload"}:
             self._send_json(200, _sample_payload())
             return
         if not path.startswith("/api/"):
@@ -60,7 +139,6 @@ class handler(BaseHTTPRequestHandler):
         if path != "/api/simulate":
             self._send_json(404, {"error": "not_found", "message": f"unknown path: {path}"})
             return
-
         try:
             payload = self._read_json_body()
         except Exception as exc:  # noqa: BLE001
@@ -127,11 +205,18 @@ def _run_simulation(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(config, dict):
         raise ValueError("config must be an object")
     config = dict(config)
+    _normalize_config(config)
 
     if "llm_api_key" not in config:
         env_key = os.getenv("OPENAI_API_KEY", "").strip()
         if env_key:
             config["llm_api_key"] = env_key
+
+    model_path = str(config.get("student_model_path", "")).strip()
+    if not model_path:
+        auto_model = _resolve_default_student_model_path()
+        if auto_model:
+            config["student_model_path"] = auto_model
 
     db_path = os.getenv("EVALBUDDY_STORE_FILE", str(Path(tempfile.gettempdir()) / "edu_sim_store.json"))
     repo = Repository(db_path=db_path)
@@ -143,6 +228,162 @@ def _run_simulation(payload: dict[str, Any]) -> dict[str, Any]:
         config=config,
         lecture_package=lecture_package if isinstance(lecture_package, dict) else None,
     )
+
+
+def _normalize_config(config: dict[str, Any]) -> None:
+    quality_state, quality_score = _resolve_state_or_numeric(
+        raw=config.get("lecture_quality_state", config.get("lecture_quality")),
+        mapping=LECTURE_QUALITY_LEVELS,
+        score_key="score_01",
+        default_state="clear_with_examples",
+        min_value=0.0,
+        max_value=1.0,
+    )
+    difficulty_state, difficulty_score = _resolve_state_or_numeric(
+        raw=config.get("lecture_difficulty_state", config.get("lecture_difficulty")),
+        mapping=LECTURE_DIFFICULTY_LEVELS,
+        score_key="score_01",
+        default_state="appropriate_for_average",
+        min_value=0.0,
+        max_value=1.0,
+    )
+    config["lecture_quality_state"] = quality_state
+    config["lecture_difficulty_state"] = difficulty_state
+    config["lecture_quality"] = round(quality_score, 4)
+    config["lecture_difficulty"] = round(difficulty_score, 4)
+
+
+def _build_students(payload: dict[str, Any]) -> list[Any]:
+    explicit = payload.get("students", [])
+    if isinstance(explicit, list) and explicit:
+        return [parse_student_row(row) for row in explicit if isinstance(row, dict)]
+
+    generator = payload.get("student_generator", {})
+    if not isinstance(generator, dict):
+        return []
+
+    mode = str(generator.get("mode", "synthetic")).strip().lower()
+    if mode == "specific":
+        knowledge_state, knowledge_score = _resolve_state_or_numeric(
+            raw=generator.get("background_knowledge_state", generator.get("knowledge_level_100")),
+            mapping=BACKGROUND_KNOWLEDGE_LEVELS,
+            score_key="score_100",
+            default_state="partial_prereq",
+            min_value=0.0,
+            max_value=100.0,
+        )
+        understanding_state, understanding_score = _resolve_state_or_numeric(
+            raw=generator.get("understanding_state", generator.get("intelligence_level_100")),
+            mapping=UNDERSTANDING_LEVELS,
+            score_key="score_100",
+            default_state="needs_time_only",
+            min_value=0.0,
+            max_value=100.0,
+        )
+        row = create_specific_student_row(
+            student_id=str(generator.get("student_id", "stu_specific_001")),
+            name=str(generator.get("name", "특정 학생")),
+            knowledge_level_100=knowledge_score,
+            intelligence_level_100=understanding_score,
+            level=(str(generator.get("level", "")).strip() or None),
+            strengths=_to_list(generator.get("strengths")),
+            weaknesses=_to_list(generator.get("weaknesses")),
+        )
+        row["traits"] = {
+            **(row.get("traits") or {}),
+            "background_knowledge_state": knowledge_state,
+            "understanding_state": understanding_state,
+        }
+        return [parse_student_row(row)]
+
+    knowledge_state, knowledge_score = _resolve_state_or_numeric(
+        raw=generator.get("background_knowledge_state", generator.get("knowledge_level_100")),
+        mapping=BACKGROUND_KNOWLEDGE_LEVELS,
+        score_key="score_100",
+        default_state="partial_prereq",
+        min_value=0.0,
+        max_value=100.0,
+    )
+    understanding_state, understanding_score = _resolve_state_or_numeric(
+        raw=generator.get("understanding_state", generator.get("intelligence_level_100")),
+        mapping=UNDERSTANDING_LEVELS,
+        score_key="score_100",
+        default_state="needs_time_only",
+        min_value=0.0,
+        max_value=100.0,
+    )
+    spread = _resolve_variability_spread(generator)
+    rows = create_synthetic_students(
+        count=max(1, int(generator.get("count", 20))),
+        base_knowledge_level_100=knowledge_score,
+        base_intelligence_level_100=understanding_score,
+        knowledge_spread=spread,
+        intelligence_spread=spread,
+        prefix=str(generator.get("prefix", "sim_student")),
+        seed=int(generator.get("seed", 42)),
+    )
+    parsed = [parse_student_row(row) for row in rows]
+    for student in parsed:
+        student.traits["background_knowledge_state"] = knowledge_state
+        student.traits["understanding_state"] = understanding_state
+    return parsed
+
+
+def _resolve_variability_spread(generator: dict[str, Any]) -> float:
+    numeric = generator.get("knowledge_spread")
+    if numeric is not None:
+        try:
+            return max(0.0, float(numeric))
+        except (TypeError, ValueError):
+            pass
+    state = str(generator.get("variability_state", "medium")).strip().lower()
+    return float(VARIABILITY_SPREAD_LEVELS.get(state, 8.0))
+
+
+def _resolve_state_or_numeric(
+    raw: Any,
+    mapping: dict[str, dict[str, Any]],
+    score_key: str,
+    default_state: str,
+    min_value: float,
+    max_value: float,
+) -> tuple[str, float]:
+    if raw is None:
+        item = mapping[default_state]
+        return default_state, float(item[score_key])
+
+    if isinstance(raw, (int, float)):
+        value = max(min_value, min(max_value, float(raw)))
+        return "custom_numeric", value
+
+    raw_str = str(raw).strip()
+    if not raw_str:
+        item = mapping[default_state]
+        return default_state, float(item[score_key])
+    if raw_str in mapping:
+        return raw_str, float(mapping[raw_str][score_key])
+
+    # allow number-like string
+    try:
+        value = max(min_value, min(max_value, float(raw_str)))
+        return "custom_numeric", value
+    except ValueError:
+        item = mapping[default_state]
+        return default_state, float(item[score_key])
+
+
+def _resolve_default_student_model_path() -> str | None:
+    env_path = os.getenv("STUDENT_MODEL_PATH", "").strip()
+    if env_path and Path(env_path).exists():
+        return env_path
+    candidates = [
+        ROOT / "ml_models" / "student_sim_model.json",
+        ROOT / "saved_models" / "student_sim_model.json",
+    ]
+    for path in candidates:
+        if path.exists():
+            return str(path)
+    return None
 
 
 def _merge_package_text(package: dict[str, Any]) -> str:
@@ -162,39 +403,6 @@ def _merge_package_text(package: dict[str, Any]) -> str:
     return "\n".join([transcript] + material_texts).strip()
 
 
-def _build_students(payload: dict[str, Any]) -> list[Any]:
-    explicit = payload.get("students", [])
-    if isinstance(explicit, list) and explicit:
-        return [parse_student_row(row) for row in explicit if isinstance(row, dict)]
-
-    generator = payload.get("student_generator", {})
-    if not isinstance(generator, dict):
-        return []
-    mode = str(generator.get("mode", "synthetic")).strip().lower()
-    if mode == "specific":
-        row = create_specific_student_row(
-            student_id=str(generator.get("student_id", "stu_specific_001")),
-            name=str(generator.get("name", "특정 학생")),
-            knowledge_level_100=float(generator.get("knowledge_level_100", 55.0)),
-            intelligence_level_100=float(generator.get("intelligence_level_100", 55.0)),
-            level=(str(generator.get("level", "")).strip() or None),
-            strengths=_to_list(generator.get("strengths")),
-            weaknesses=_to_list(generator.get("weaknesses")),
-        )
-        return [parse_student_row(row)]
-
-    rows = create_synthetic_students(
-        count=max(1, int(generator.get("count", 20))),
-        base_knowledge_level_100=float(generator.get("knowledge_level_100", 50.0)),
-        base_intelligence_level_100=float(generator.get("intelligence_level_100", 55.0)),
-        knowledge_spread=float(generator.get("knowledge_spread", 8.0)),
-        intelligence_spread=float(generator.get("intelligence_spread", 8.0)),
-        prefix=str(generator.get("prefix", "sim_student")),
-        seed=int(generator.get("seed", 42)),
-    )
-    return [parse_student_row(row) for row in rows]
-
-
 def _to_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(x) for x in value]
@@ -210,12 +418,13 @@ def _sample_payload() -> dict[str, Any]:
         "student_generator": {
             "mode": "synthetic",
             "count": 25,
-            "knowledge_level_100": 45,
-            "intelligence_level_100": 55,
+            "background_knowledge_state": "partial_prereq",
+            "understanding_state": "needs_time_only",
+            "variability_state": "medium",
         },
         "config": {
-            "lecture_quality": 0.8,
-            "lecture_difficulty": 0.5,
+            "lecture_quality_state": "clear_with_examples",
+            "lecture_difficulty_state": "appropriate_for_average",
             "max_objectives": 5,
             "interview_mode": "rule",
         },

@@ -76,6 +76,7 @@ class WorkflowService:
 
         model_predictor = self._load_student_model_predictor(config)
         interview_mode, llm_engine, interview_note = self._build_interview_engine(config)
+        interview_mode_used = interview_mode
 
         all_sim_rows: list[tuple[str, str, str, str, float]] = []
         student_reports: list[dict[str, Any]] = []
@@ -106,6 +107,7 @@ class WorkflowService:
                         criteria=criteria,
                     )
                     interview_used = "rule_fallback"
+                    interview_mode_used = "rule_fallback"
                     interview_note = f"llm failed and fallback applied: {exc}"
             else:
                 interview = self.interview_engine.evaluate(
@@ -226,8 +228,28 @@ class WorkflowService:
             "config": config,
             "approved_plan_id": plan_id_used,
             "student_simulator_engine": "trained_model" if model_predictor is not None else "rule",
-            "interview_engine_used": interview_mode,
+            "interview_engine_used": interview_mode_used,
             "interview_engine_note": interview_note,
+            "execution_meta": {
+                "student_simulator": {
+                    "code": "trained_model" if model_predictor is not None else "rule",
+                    "label": "학습 기반 학생 시뮬레이터" if model_predictor is not None else "규칙 기반 학생 시뮬레이터",
+                    "description": (
+                        "저장된 학생 모델 가중치로 pre/post를 예측"
+                        if model_predictor is not None
+                        else "학생 특성 규칙으로 pre/post를 계산"
+                    ),
+                },
+                "interviewer": {
+                    "code": interview_mode_used,
+                    "label": self._interview_engine_label(interview_mode_used),
+                    "description": interview_note,
+                },
+            },
+            "result_format": {
+                "version": "evalbuddy.report.v2",
+                "description": "group_summary(집단 통계), student_reports(개별 결과), execution_meta(실행 방식 설명)",
+            },
             "generated_at_utc": now,
         }
         self.repo.save_report(run_id, report)
@@ -284,6 +306,14 @@ class WorkflowService:
             if label:
                 result[label] += 1
         return result
+
+    @staticmethod
+    def _interview_engine_label(code: str) -> str:
+        if code == "llm":
+            return "LLM 면접 평가"
+        if code == "rule_fallback":
+            return "LLM 실패 후 규칙 평가 fallback"
+        return "규칙 기반 면접 평가"
 
     @staticmethod
     def _criterion_question(criterion_id: str, criteria: list[Any]) -> str:
