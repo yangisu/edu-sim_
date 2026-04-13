@@ -335,7 +335,7 @@
 
       document.getElementById("sample").addEventListener("click", async () => {
         try {
-          const res = await fetch("/api/sample-payload");
+          const res = await fetch("/api/sample");
           const data = await res.json();
           document.getElementById("title").value = data.lecture_title || "";
           document.getElementById("lecture").value = data.lecture_content || "";
